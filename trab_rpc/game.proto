@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package game;
+
+// O serviço principal que o servidor implementará
+service GameServer {
+  // --- Funções do Lobby ---
+
+  // Cliente pede a lista de salas disponíveis
+  rpc GetLobbies(Empty) returns (LobbyList);
+
+  // Cliente cria uma nova sala e se torna o "host"
+  rpc CreateRoom(CreateRoomRequest) returns (RoomInfo);
+
+  // Cliente entra em uma sala existente
+  // Retorna um erro se a sala estiver cheia ou não existir
+  rpc JoinRoom(JoinRoomRequest) returns (RoomInfo);
+
+  // --- Funções do Jogo ---
+
+  // Cliente (jogador) faz uma jogada
+  rpc MakeMove(MoveRequest) returns (MoveResponse);
+
+  // Cliente se "inscreve" para receber atualizações do jogo em tempo real.
+  // O servidor "empurra" (stream) o estado do jogo para os dois jogadores
+  // sempre que algo acontece (alguém joga, o turno muda, etc.)
+  rpc SubscribeToGameUpdates(SubscribeRequest) returns (stream GameState);
+}
+
+// Mensagem Vazia
+message Empty {}
+
+// --- Mensagens do Lobby ---
+
+message CreateRoomRequest {
+  string player_name = 1;
+  string room_name = 2;
+}
+
+message JoinRoomRequest {
+  string player_name = 1;
+  string room_id = 2;
+}
+
+message RoomInfo {
+  string room_id = 1;       // ID único (ex: "sala-123")
+  string room_name = 2;
+  int32 player_count = 3;
+  string status = 4;        // Ex: "WAITING", "IN_GAME"
+}
+
+message LobbyList {
+  repeated RoomInfo rooms = 1;
+}
+
+// --- Mensagens do Jogo ---
+
+message SubscribeRequest {
+  string room_id = 1;
+  string player_id = 2; // (pode ser o player_name)
+}
+
+message MoveRequest {
+  string room_id = 1;
+  string player_id = 2;
+  PlayerAction action = 3; // O que o jogador escolheu fazer
+}
+
+enum PlayerAction {
+  SHOOT_OPPONENT = 0;
+  SHOOT_SELF = 1;
+  QUIT_GAME = 2;
+}
+
+// A resposta para uma jogada (pode ser simples)
+message MoveResponse {
+  bool success = 1;
+  string error_message = 2; // Ex: "Não é o seu turno"
+}
+
+// A mensagem mais importante: descreve o estado atual do jogo
+message GameState {
+  string room_id = 1;
+  string status = 2; // "WAITING", "PLAYER_TURN", "GAME_OVER"
+  
+  // Info dos jogadores
+  string player1_name = 3;
+  string player2_name = 4;
+  int32 player1_lives = 5;
+  int32 player2_lives = 6;
+  string current_turn_player_id = 7; // ID do jogador que deve jogar
+
+  // Info do "pente" de balas
+  int32 bullets_in_clip = 8;
+  int32 live_bullets_in_clip = 9;
+
+  // Mensagem de log para mostrar no terminal
+  // Ex: "Jogador 1 atirou em si mesmo... era festim!"
+  string last_action_log = 10; 
+  string winner_id = 11; // Quem ganhou (se houver)
+}
